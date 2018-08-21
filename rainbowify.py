@@ -1,48 +1,60 @@
 import argparse
 
+default_grad = 'darkbow'
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", help="input file")
+parser.add_argument("-c", "--color", help="specify gradient")
 parser.add_argument("-o", "--output", help="output file")
 parser.add_argument("-t", "--text", help="input text")
+parser.add_argument("-l", "--list", help="list all gradients", action="store_true")
+parser.add_argument("-w", "--word", help="change per word, not per character", action="store_true")
 args = parser.parse_args()
 
-# Starting color for text. Begins on red, #880000
-color = ['88','00','00']
+colors_dict = {}
+colors_dict['darkbow'] = ['880000','884400','888800','448800','008800','008844','008888','004488','000088','440088','880088','880044']
+colors_dict['rainbow'] = ['ff0000','ff8800','ffff00','88ff00','00ff00','00ff88','00ffff','0088ff','0000ff','8800ff','ff00ff','ff0088']
+colors_dict['hs_kids'] = ['0715cd','4ac925','e00707','b536da']
+colors_dict['hs_trol'] = ['a10000','a15000','a1a100','416600','008141','008282','005682','000056','2b0057','6a006a','77003c','626262']
+colors_dict['hs_horn'] = ['ffba29','ffba29','ffba29','ff9000','ff9000','ff9000','ff4200','ff4200','ff4200','ff9000','ff9000','ff9000']
 
-# turns the string array into a hexcode
-def color_to_str(color):
-	out = "#"
-	for c in color:
-		out += c
-	return out
+if args.color:
+	gradient = colors_dict[args.color]
+else:
+	gradient = colors_dict[default_grad]
 
-# given the color triplet as input, returns the next in sequence
-def next_rainbow(rainbow):
-	out = ['a','a','a']
-	for i in range(0,3):
-		if rainbow[i] == '88':
-			if rainbow[(i+1)%3] == '88':
-				out[i] = '44' # if next is full, this is "fading away"
-			else:
-				out[i] = '88' # if next is not full, this stays full
-		elif rainbow[i] == '44':
-			if rainbow[i-1] == '00': # this was fading away
-				out[i] = '00' # and now it finishes
-			else:
-				out[i] = '88' # otherwise it must be building up
-		else:
-			if rainbow[i-1] == '88' and rainbow[i-2] == '00': # prevents building before i-2 has faded
-				out[i] = '44'
-			else:
-				out[i] = '00' # if it's not time to build up, it stays at 0
-	return out
+if args.list:
+	for s in colors_dict:
+		print(s)
+	exit()
 
 out = ""
 
+i = 0
+tag_flag = False
+word_flag = True
+
 if args.text: # text provided on cmd line rather than via file
 	for c in args.text:
-		out += '<span style="color:' + color_to_str(color) + '">' + c + '</span>'
-		color = next_rainbow(color)
+		if c == '<': 		# disable style insertion for existing html tags
+			tag_flag = True
+		elif c == '>': # technically <<>> fucks with this but normal html shouldn't have that
+			tag_flag = False
+			out += c
+			continue
+		if tag_flag:
+			out += c
+		else:
+			if (args.word and word_flag and c.isalpha()) or c == ' ':
+				# activates only if:
+				# 1. word option is on
+				# 2. prev char is alpha (in a word)
+				# 3. curr char is alpha (still in a word)
+				# or if it's a space because otherwise it keeps "skipping"
+				i -= 1
+			i = (i + 1) % len(gradient) # increment index, looping if needed
+			word_flag = c.isalpha() # still advances when not still in a word
+			out += '<span style="color:#' + gradient[i] + '">' + c + '</span>'
 	if args.output:
 		with open(args.output,"w") as file:
 			file.write(out)
@@ -52,8 +64,25 @@ elif args.input: # text provided via file rather than on cmd line
 	with open(args.input,"r") as in_file:
 		text = in_file.read()
 		for c in text:
-			out += '<span style="color:' + color_to_str(color) + '">' + c + '</span>'
-			color = next_rainbow(color)
+			if c == '<':
+				tag_flag = True
+			elif c == '>': # technically <<>> fucks with this but normal html shouldn't have that
+				tag_flag = False
+				out += c
+				continue
+			if tag_flag:
+				out += c
+			else:
+				if (args.word and word_flag and c.isalpha()) or c == ' ':
+					# activates only if:
+					# 1. word option is on
+					# 2. prev char is alpha (in a word)
+					# 3. curr char is alpha (still in a word)
+					# or if it's a space because otherwise it keeps "skipping"
+					i -= 1
+				i = (i + 1) % len(gradient) # increment index, looping if needed
+				word_flag = c.isalpha() # still advances when not still in a word
+				out += '<span style="color:#' + gradient[i] + '">' + c + '</span>'
 		if args.output:
 			with open(args.output,"w") as file:
 				file.write(out)
